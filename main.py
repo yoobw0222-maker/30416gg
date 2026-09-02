@@ -7,10 +7,10 @@ st.title("🎯 아무거나 룰렛")
 # 사용자 입력 받기
 items_input = st.text_input(
     "항목 및 확률 입력 (쉼표로 구분)", 
-    "자장면(40%), 짬뽕(30%), 볶음밥(20%), 탕수육(10%)"
+    "1등(2%), 2등(5%), 3등(10%), 4등(20%), 꽝(63%)"
 )
 
-# 텍스트 파싱 함수 (항목명과 확률 추출)
+# 텍스트 파싱 함수
 def parse_items(input_str):
     raw_items = [item.strip() for item in input_str.split(",") if item.strip()]
     if not raw_items:
@@ -21,7 +21,6 @@ def parse_items(input_str):
     unspecified_count = 0
 
     for item in raw_items:
-        # 항목명(숫자%) 패턴 매칭
         match = re.search(r'^(.*?)\s*\((\d+(?:\.\d+)?)\%\)$', item)
         if match:
             name = match.group(1).strip()
@@ -32,7 +31,6 @@ def parse_items(input_str):
             parsed.append({"name": item, "prob": None, "specified": False})
             unspecified_count += 1
 
-    # 확률을 입력하지 않은 항목이 있는 경우 남은 확률을 균등 분배
     if unspecified_count > 0:
         remaining_prob = max(0.0, 100.0 - specified_sum)
         default_prob = remaining_prob / unspecified_count
@@ -40,7 +38,6 @@ def parse_items(input_str):
             if not item["specified"]:
                 item["prob"] = default_prob
     
-    # 지정 확률 총합이 100%를 넘는 경우 자동 정규화
     total_prob = sum(item["prob"] for item in parsed)
     if total_prob > 0:
         for item in parsed:
@@ -56,7 +53,6 @@ parsed_items = parse_items(items_input)
 if len(parsed_items) < 2:
     st.warning("최소 2개 이상의 항목을 입력해 주세요.")
 else:
-    # JavaScript 전달용 데이터 준비
     js_names = [f"{item['name']} ({item['prob']:.1f}%)" for item in parsed_items]
     js_weights = [item["weight"] for item in parsed_items]
 
@@ -73,13 +69,13 @@ else:
             }}
             .wheel-wrapper {{
                 position: relative;
-                width: 320px;
-                height: 320px;
+                width: 440px;
+                height: 440px;
                 margin-top: 10px;
             }}
             .pointer {{
                 position: absolute;
-                top: -10px;
+                top: 0px;
                 left: 50%;
                 transform: translateX(-50%);
                 width: 0;
@@ -91,7 +87,6 @@ else:
             }}
             canvas {{
                 border-radius: 50%;
-                box-shadow: 0 4px 10px rgba(0,0,0,0.2);
             }}
             button {{
                 margin-top: 20px;
@@ -121,7 +116,7 @@ else:
         <div class="roulette-container">
             <div class="wheel-wrapper">
                 <div class="pointer"></div>
-                <canvas id="wheel" width="320" height="320"></canvas>
+                <canvas id="wheel" width="440" height="440"></canvas>
             </div>
             <button id="spinBtn" onclick="spin()">룰렛 돌리기! 🎰</button>
             <div id="result"></div>
@@ -136,45 +131,85 @@ else:
             const ctx = canvas.getContext('2d');
             const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#E7E9ED', '#76D7C4'];
 
-            // 확률 기반 각 각도의 크기 계산 (전체 = 2 * PI)
             const arcs = weights.map(w => w * 2 * Math.PI);
+            const centerX = 220;
+            const centerY = 220;
+            const radius = 140; // 룰렛 원 반지름
 
             let currentAngle = 0;
             let isSpinning = false;
 
             function drawWheel() {{
-                ctx.clearRect(0, 0, 320, 320);
+                ctx.clearRect(0, 0, 440, 440);
                 let startAngle = currentAngle;
 
+                // 1. 룰렛 조각 그리기
                 for (let i = 0; i < numItems; i++) {{
                     const arc = arcs[i];
                     const endAngle = startAngle + arc;
 
                     ctx.beginPath();
                     ctx.fillStyle = colors[i % colors.length];
-                    ctx.moveTo(160, 160);
-                    ctx.arc(160, 160, 150, startAngle, endAngle);
+                    ctx.moveTo(centerX, centerY);
+                    ctx.arc(centerX, centerY, radius, startAngle, endAngle);
                     ctx.fill();
                     ctx.stroke();
 
-                    // 텍스트 출력 (조각 크기가 일정 이상일 때만 표시)
-                    if (arc > 0.08) {{
+                    startAngle = endAngle;
+                }}
+
+                // 2. 텍스트 및 외부 지시선 그리기
+                startAngle = currentAngle;
+                for (let i = 0; i < numItems; i++) {{
+                    const arc = arcs[i];
+                    const midAngle = startAngle + arc / 2;
+
+                    // 큰 조각: 내부에 텍스트 작성
+                    if (arc >= 0.25) {{
                         ctx.save();
                         ctx.fillStyle = "#ffffff";
                         ctx.font = "bold 13px sans-serif";
-                        const textAngle = startAngle + arc / 2;
-                        ctx.translate(160 + Math.cos(textAngle) * 95, 160 + Math.sin(textAngle) * 95);
-                        ctx.rotate(textAngle + Math.PI / 2);
+                        ctx.translate(centerX + Math.cos(midAngle) * (radius * 0.65), centerY + Math.sin(midAngle) * (radius * 0.65));
+                        ctx.rotate(midAngle + Math.PI / 2);
                         
-                        // 텍스트 자르기 처리
                         let text = names[i];
-                        if (text.length > 12) text = text.substring(0, 10) + "..";
+                        if (text.length > 10) text = text.substring(0, 8) + "..";
                         
                         ctx.fillText(text, -ctx.measureText(text).width / 2, 0);
                         ctx.restore();
+                    }} 
+                    // 작은 조각: 외부로 지시선을 빼서 텍스트 작성
+                    else {{
+                        const lineStartX = centerX + Math.cos(midAngle) * (radius - 5);
+                        const lineStartY = centerY + Math.sin(midAngle) * (radius - 5);
+                        const lineEndX = centerX + Math.cos(midAngle) * (radius + 25);
+                        const lineEndY = centerY + Math.sin(midAngle) * (radius + 25);
+
+                        // 지시선 그리기
+                        ctx.beginPath();
+                        ctx.strokeStyle = "#333333";
+                        ctx.lineWidth = 1.5;
+                        ctx.moveTo(lineStartX, lineStartY);
+                        ctx.lineTo(lineEndX, lineEndY);
+                        ctx.stroke();
+
+                        // 텍스트 그리기
+                        ctx.save();
+                        ctx.fillStyle = "#333333";
+                        ctx.font = "bold 11px sans-serif";
+                        
+                        // 텍스트 위치 정렬 (좌/우 방향에 맞춤)
+                        const isRightSide = Math.cos(midAngle) >= 0;
+                        ctx.textAlign = isRightSide ? "left" : "right";
+                        
+                        const textX = lineEndX + (isRightSide ? 5 : -5);
+                        const textY = lineEndY + 4;
+
+                        ctx.fillText(names[i], textX, textY);
+                        ctx.restore();
                     }}
 
-                    startAngle = endAngle;
+                    startAngle += arc;
                 }}
             }}
 
@@ -184,7 +219,7 @@ else:
                 document.getElementById('spinBtn').disabled = true;
                 document.getElementById('result').innerText = "두근두근... 룰렛이 돌고 있습니다!";
 
-                const duration = 10000; // 10초
+                const duration = 10000;
                 const startAngle = currentAngle;
                 
                 const randomAngle = Math.random() * 2 * Math.PI;
@@ -206,7 +241,6 @@ else:
                         isSpinning = false;
                         document.getElementById('spinBtn').disabled = false;
                         
-                        // 12시 방향(화살표) 기준으로 당첨 항목 계산
                         const normalizedAngle = (2 * Math.PI - (currentAngle % (2 * Math.PI))) % (2 * Math.PI);
                         const pointerAngle = (normalizedAngle + Math.PI / 2) % (2 * Math.PI);
                         
@@ -233,4 +267,4 @@ else:
     </html>
     """
     
-    components.html(html_code, height=480)
+    components.html(html_code, height=530)
