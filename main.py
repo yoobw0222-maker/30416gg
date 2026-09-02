@@ -4,10 +4,11 @@ import re
 
 st.title("🎯 아무거나 룰렛")
 
-# 사용자 입력 받기
+# 사용자 입력 받기 (안내 문구 수정)
 items_input = st.text_input(
-    "항목 및 확률 입력 (쉼표로 구분)", 
-    "1등(2%), 2등(5%), 3등(10%), 4등(20%), 꽝(63%)"
+    "항목 및 (확률) 입력 (쉼표로 구분)", 
+    "1등(2%), 2등(5%), 3등(10%), 4등(20%), 꽝(63%)",
+    help="예시: 항목명(확률%) 형태로 입력해 주세요. 확률을 생략하면 남은 확률이 균등 분배됩니다."
 )
 
 # 텍스트 파싱 함수
@@ -134,16 +135,63 @@ else:
             const arcs = weights.map(w => w * 2 * Math.PI);
             const centerX = 220;
             const centerY = 220;
-            const radius = 140; // 룰렛 원 반지름
+            const radius = 140;
 
             let currentAngle = 0;
             let isSpinning = false;
+            let lastArcIndex = -1;
+
+            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+            function playTickSound() {{
+                if (audioCtx.state === 'suspended') {{
+                    audioCtx.resume();
+                }}
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.04);
+                
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.04);
+            }}
+
+            function playWinSound() {{
+                if (audioCtx.state === 'suspended') {{
+                    audioCtx.resume();
+                }}
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, idx) => {{
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime + idx * 0.1);
+                    
+                    gain.gain.setValueAtTime(0, audioCtx.currentTime + idx * 0.1);
+                    gain.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + idx * 0.1 + 0.05);
+                    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + idx * 0.1 + 0.8);
+                    
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    
+                    osc.start(audioCtx.currentTime + idx * 0.1);
+                    osc.stop(audioCtx.currentTime + idx * 0.1 + 0.8);
+                }});
+            }}
 
             function drawWheel() {{
                 ctx.clearRect(0, 0, 440, 440);
                 let startAngle = currentAngle;
 
-                // 1. 룰렛 조각 그리기
                 for (let i = 0; i < numItems; i++) {{
                     const arc = arcs[i];
                     const endAngle = startAngle + arc;
@@ -158,13 +206,11 @@ else:
                     startAngle = endAngle;
                 }}
 
-                // 2. 텍스트 및 외부 지시선 그리기
                 startAngle = currentAngle;
                 for (let i = 0; i < numItems; i++) {{
                     const arc = arcs[i];
                     const midAngle = startAngle + arc / 2;
 
-                    // 큰 조각: 내부에 텍스트 작성
                     if (arc >= 0.25) {{
                         ctx.save();
                         ctx.fillStyle = "#ffffff";
@@ -177,15 +223,12 @@ else:
                         
                         ctx.fillText(text, -ctx.measureText(text).width / 2, 0);
                         ctx.restore();
-                    }} 
-                    // 작은 조각: 외부로 지시선을 빼서 텍스트 작성
-                    else {{
+                    }} else {{
                         const lineStartX = centerX + Math.cos(midAngle) * (radius - 5);
                         const lineStartY = centerY + Math.sin(midAngle) * (radius - 5);
                         const lineEndX = centerX + Math.cos(midAngle) * (radius + 25);
                         const lineEndY = centerY + Math.sin(midAngle) * (radius + 25);
 
-                        // 지시선 그리기
                         ctx.beginPath();
                         ctx.strokeStyle = "#333333";
                         ctx.lineWidth = 1.5;
@@ -193,12 +236,10 @@ else:
                         ctx.lineTo(lineEndX, lineEndY);
                         ctx.stroke();
 
-                        // 텍스트 그리기
                         ctx.save();
                         ctx.fillStyle = "#333333";
                         ctx.font = "bold 11px sans-serif";
                         
-                        // 텍스트 위치 정렬 (좌/우 방향에 맞춤)
                         const isRightSide = Math.cos(midAngle) >= 0;
                         ctx.textAlign = isRightSide ? "left" : "right";
                         
@@ -234,6 +275,25 @@ else:
                         const easeOut = 1 - Math.pow(1 - progress, 3); 
                         currentAngle = startAngle + (totalRotation * easeOut);
                         drawWheel();
+
+                        const normalizedAngle = (2 * Math.PI - (currentAngle % (2 * Math.PI))) % (2 * Math.PI);
+                        const pointerAngle = (normalizedAngle + Math.PI / 2) % (2 * Math.PI);
+                        
+                        let accumulatedAngle = 0;
+                        let currentIndex = 0;
+                        for (let i = 0; i < numItems; i++) {{
+                            accumulatedAngle += arcs[i];
+                            if (pointerAngle <= accumulatedAngle) {{
+                                currentIndex = i;
+                                break;
+                            }}
+                        }}
+
+                        if (currentIndex !== lastArcIndex) {{
+                            playTickSound();
+                            lastArcIndex = currentIndex;
+                        }}
+
                         requestAnimationFrame(animate);
                     }} else {{
                         currentAngle = startAngle + totalRotation;
@@ -254,6 +314,7 @@ else:
                             }}
                         }}
                         
+                        playWinSound();
                         document.getElementById('result').innerText = "🎉 당첨 결과: " + names[winningIndex];
                     }}
                 }}
