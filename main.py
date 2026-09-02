@@ -1,7 +1,8 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.title("🎯 시각적 10초 룰렛 추첨기")
+# 웹 앱 제목 변경
+st.title("🎯 아무거나 룰렛")
 
 # 사용자 입력 받기
 items_input = st.text_input("항목 입력 (쉼표로 구분)", "자장면, 짬뽕, 볶음밥, 탕수육, 초밥, 피자")
@@ -76,7 +77,8 @@ else:
                 <div class="pointer"></div>
                 <canvas id="wheel" width="320" height="320"></canvas>
             </div>
-            <button id="spinBtn" onclick="spin()">10초 룰렛 돌리기! 🎰</button>
+            <!-- 버튼 문구 변경 -->
+            <button id="spinBtn" onclick="spin()">룰렛 돌리기! 🎰</button>
             <div id="result"></div>
         </div>
 
@@ -87,13 +89,11 @@ else:
             const numItems = items.length;
             const arc = (2 * Math.PI) / numItems;
             
-            // 색상 배열 생성
             const colors = ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#E7E9ED', '#76D7C4'];
 
             let currentAngle = 0;
             let isSpinning = false;
 
-            // 룰렛 그리기
             function drawWheel() {{
                 ctx.clearRect(0, 0, 320, 320);
                 for (let i = 0; i < numItems; i++) {{
@@ -105,7 +105,6 @@ else:
                     ctx.fill();
                     ctx.stroke();
 
-                    // 텍스트 그리기
                     ctx.save();
                     ctx.fillStyle = "#ffffff";
                     ctx.font = "bold 14px sans-serif";
@@ -116,17 +115,15 @@ else:
                 }}
             }}
 
-            // 룰렛 돌리기 함수
             function spin() {{
                 if (isSpinning) return;
                 isSpinning = true;
                 document.getElementById('spinBtn').disabled = true;
                 document.getElementById('result').innerText = "두근두근... 룰렛이 돌고 있습니다!";
 
-                const duration = 10000; // 정확히 10초
+                const duration = 10000; // 10초 유지
                 const startAngle = currentAngle;
                 
-                // 랜덤 회전수 설정 (최소 10바퀴 ~ 15바퀴 + 랜덤 각도)
                 const randomAngle = Math.random() * 2 * Math.PI;
                 const totalRotation = (10 * 2 * Math.PI) + randomAngle;
                 
@@ -135,7 +132,6 @@ else:
                 function animate(currentTime) {{
                     const elapsed = currentTime - startTime;
                     if (elapsed < duration) {{
-                        // easeOutQuad (점점 천천히 멈추는 애니메이션 공식)
                         const progress = elapsed / duration;
                         const easeOut = 1 - Math.pow(1 - progress, 3); 
                         currentAngle = startAngle + (totalRotation * easeOut);
@@ -147,8 +143,6 @@ else:
                         isSpinning = false;
                         document.getElementById('spinBtn').disabled = false;
                         
-                        // 당첨 항목 계산
-                        // 화살표가 12시 방향(-90도 또는 3/2 PI)을 가리키므로 이에 맞추어 계산
                         const normalizedAngle = (2 * Math.PI - (currentAngle % (2 * Math.PI))) % (2 * Math.PI);
                         const adjustedAngle = (normalizedAngle + Math.PI / 2) % (2 * Math.PI);
                         const winningIndex = Math.floor(adjustedAngle / arc) % numItems;
@@ -166,5 +160,4 @@ else:
     </html>
     """
     
-    # HTML Component 렌더링
     components.html(html_code, height=480)
